@@ -1,0 +1,36 @@
+{
+  "name": "@google/gemini-agent-server",
+  "version": "0.1.0",
+  "description": "Agent server for Gemini CLI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc -w & nodemon dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@google/gemini-cli-core": "workspace:*",
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "@types/node": "^20.0.0",
+    "nodemon": "^2.0.15",
+    "typescript": "^5.0.0",
+    "supertest": "^6.3.3",
+    "@types/supertest": "^6.0.2",
+    "vitest": "^1.2.0", // Or jest
+    "@vitest/ui": "^1.2.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc -w & nodemon dist/index.js",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  }
+}

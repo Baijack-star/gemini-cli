@@ -5,46 +5,23 @@
  */
 
 import {
-  Config,
-  ToolCallRequestInfo,
-  executeToolCall,
-  ToolRegistry,
+  Config, // Config might still be used for non-API related settings
   shutdownTelemetry,
   isTelemetrySdkInitialized,
 } from '@google/gemini-cli-core';
-import {
-  Content,
-  Part,
-  FunctionCall,
-  GenerateContentResponse,
-} from '@google/genai';
+// import {
+//   Content,
+//   Part,
+//   FunctionCall,
+//   GenerateContentResponse,
+// } from '@google/genai'; // No longer directly interacting with GenAI types here
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
-
-function getResponseText(response: GenerateContentResponse): string | null {
-  if (response.candidates && response.candidates.length > 0) {
-    const candidate = response.candidates[0];
-    if (
-      candidate.content &&
-      candidate.content.parts &&
-      candidate.content.parts.length > 0
-    ) {
-      // We are running in headless mode so we don't need to return thoughts to STDOUT.
-      const thoughtPart = candidate.content.parts[0];
-      if (thoughtPart?.thought) {
-        return null;
-      }
-      return candidate.content.parts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-    }
-  }
-  return null;
-}
+import { agentRun } from './utils/agentClient.js'; // Import the new agent client
 
 export async function runNonInteractive(
-  config: Config,
+  // config: Config, // Config may not be needed, or only for specific settings
+  _config: Config, // Marking as unused for now
   input: string,
 ): Promise<void> {
   // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -55,98 +32,34 @@ export async function runNonInteractive(
     }
   });
 
-  const geminiClient = config.getGeminiClient();
-  const toolRegistry: ToolRegistry = await config.getToolRegistry();
-
-  const chat = await geminiClient.getChat();
-  const abortController = new AbortController();
-  let currentMessages: Content[] = [{ role: 'user', parts: [{ text: input }] }];
-
   try {
-    while (true) {
-      const functionCalls: FunctionCall[] = [];
+    const result = await agentRun(input);
 
-      const responseStream = await chat.sendMessageStream({
-        message: currentMessages[0]?.parts || [], // Ensure parts are always provided
-        config: {
-          abortSignal: abortController.signal,
-          tools: [
-            { functionDeclarations: toolRegistry.getFunctionDeclarations() },
-          ],
-        },
-      });
-
-      for await (const resp of responseStream) {
-        if (abortController.signal.aborted) {
-          console.error('Operation cancelled.');
-          return;
-        }
-        const textPart = getResponseText(resp);
-        if (textPart) {
-          process.stdout.write(textPart);
-        }
-        if (resp.functionCalls) {
-          functionCalls.push(...resp.functionCalls);
-        }
-      }
-
-      if (functionCalls.length > 0) {
-        const toolResponseParts: Part[] = [];
-
-        for (const fc of functionCalls) {
-          const callId = fc.id ?? `${fc.name}-${Date.now()}`;
-          const requestInfo: ToolCallRequestInfo = {
-            callId,
-            name: fc.name as string,
-            args: (fc.args ?? {}) as Record<string, unknown>,
-            isClientInitiated: false,
-          };
-
-          const toolResponse = await executeToolCall(
-            config,
-            requestInfo,
-            toolRegistry,
-            abortController.signal,
-          );
-
-          if (toolResponse.error) {
-            const isToolNotFound = toolResponse.error.message.includes(
-              'not found in registry',
-            );
-            console.error(
-              `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
-            );
-            if (!isToolNotFound) {
-              process.exit(1);
-            }
-          }
-
-          if (toolResponse.responseParts) {
-            const parts = Array.isArray(toolResponse.responseParts)
-              ? toolResponse.responseParts
-              : [toolResponse.responseParts];
-            for (const part of parts) {
-              if (typeof part === 'string') {
-                toolResponseParts.push({ text: part });
-              } else if (part) {
-                toolResponseParts.push(part);
-              }
-            }
-          }
-        }
-        currentMessages = [{ role: 'user', parts: toolResponseParts }];
-      } else {
-        process.stdout.write('\n'); // Ensure a final newline
-        return;
-      }
+    if (result.error) {
+      console.error(`Error during non-interactive run: ${result.error}`);
+      // Attempt to parse and format if it's a known API error structure,
+      // otherwise print the raw error.
+      // The error structure from agentRun might differ from direct API errors.
+      console.error(parseAndFormatApiError(result.error));
+      process.exit(1);
     }
+
+    if (result.finalAnswer) {
+      process.stdout.write(result.finalAnswer);
+      // Ensure a final newline if the server doesn't guarantee it.
+      if (!result.finalAnswer.endsWith('\n')) {
+        process.stdout.write('\n');
+      }
+    } else {
+      // Handle cases where there's no error but also no final answer
+      // This might indicate an issue with the server's /run endpoint logic
+      console.warn("Non-interactive run completed without a final answer.");
+    }
+
   } catch (error) {
-    console.error(
-      parseAndFormatApiError(
-        error,
-        config.getContentGeneratorConfig().authType,
-      ),
-    );
+    // This will catch errors from agentRun (e.g., network issues, server 500s)
+    // or unexpected errors in this function.
+    console.error(parseAndFormatApiError(error));
     process.exit(1);
   } finally {
     if (isTelemetrySdkInitialized()) {

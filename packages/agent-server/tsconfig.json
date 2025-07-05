@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "commonjs", // Or "NodeNext" if preferred and dependencies support it well
+    "lib": ["es2022"],
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node", // Or "NodeNext"
+    "resolveJsonModule": true,
+    "composite": true, // If part of a larger monorepo build
+    "baseUrl": ".",
+    "paths": {
+      "@google/gemini-cli-core": ["../core"] // Adjust if necessary based on monorepo structure
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

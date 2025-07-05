@@ -33,7 +33,7 @@ import {
   WriteFileTool,
   sessionId,
   logUserPrompt,
-  AuthType,
+  // AuthType, // AuthType might not be needed directly by CLI main
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -100,16 +100,17 @@ export async function main() {
   }
 
   const extensions = loadExtensions(workspaceRoot);
+  // The `config` object from core might be simplified or replaced later if its
+  // primary role in the CLI was Gemini API auth. For now, load it as is.
   const config = await loadCliConfig(settings.merged, extensions, sessionId);
 
-  // set default fallback to gemini api key
-  // this has to go after load cli because that's where the env is set
-  if (!settings.merged.selectedAuthType && process.env.GEMINI_API_KEY) {
-    settings.setValue(
-      SettingScope.User,
-      'selectedAuthType',
-      AuthType.USE_GEMINI,
-    );
+  // Validate connection to Agent Server.
+  // This replaces the previous auth validation.
+  const authError = validateAuthMethod(); // No longer passing selectedAuthType
+  if (authError) {
+    console.error(`Error configuring connection to agent server: ${authError}`);
+    console.error(`Please set AGENT_SERVER_URL and AGENT_SERVER_API_KEY environment variables or in your settings.`);
+    process.exit(1);
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
@@ -140,19 +141,22 @@ export async function main() {
   if (!process.env.SANDBOX) {
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
-      if (settings.merged.selectedAuthType) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
-        try {
-          const err = validateAuthMethod(settings.merged.selectedAuthType);
-          if (err) {
-            throw new Error(err);
-          }
-          await config.refreshAuth(settings.merged.selectedAuthType);
-        } catch (err) {
-          console.error('Error authenticating:', err);
-          process.exit(1);
-        }
+      // Validate agent server connection config before starting sandbox.
+      // The actual communication with the agent server will happen from within the sandbox,
+      // assuming the sandbox has network access and env vars are passed.
+      const authErr = validateAuthMethod(); // Uses new validation
+      if (authErr) {
+        // It might be better to let this error be caught by the main validation
+        // earlier, but keeping a check here if sandbox runs very early.
+        // Or, ensure AGENT_SERVER_URL/API_KEY are passed to sandbox env.
+        console.error('Error configuring agent server connection for sandbox:', authErr);
+        process.exit(1);
       }
+      // NOTE: `config.refreshAuth` call removed.
+      // The CLI no longer directly refreshes auth with Gemini services.
+      // The agent server handles this.
+      // We need to ensure AGENT_SERVER_URL and AGENT_SERVER_API_KEY are available
+      // inside the sandbox if the CLI (running in sandbox) needs to make calls.
       await start_sandbox(sandboxConfig, memoryArgs);
       process.exit(0);
     } else {
@@ -272,26 +276,18 @@ async function loadNonInteractiveConfig(
 }
 
 async function validateNonInterActiveAuth(
-  selectedAuthType: AuthType | undefined,
-  nonInteractiveConfig: Config,
+  _selectedAuthType: unknown, // This parameter is no longer used due to server-based auth
+  nonInteractiveConfig: Config, // Config might be used for other settings
 ) {
-  // making a special case for the cli. many headless environments might not have a settings.json set
-  // so if GEMINI_API_KEY is set, we'll use that. However since the oauth things are interactive anyway, we'll
-  // still expect that exists
-  if (!selectedAuthType && !process.env.GEMINI_API_KEY) {
-    console.error(
-      `Please set an Auth method in your ${USER_SETTINGS_PATH} OR specify GEMINI_API_KEY env variable file before running`,
-    );
+  // Validate connection to Agent Server for non-interactive mode.
+  const authError = validateAuthMethod(); // Uses the new validation logic
+  if (authError) {
+    console.error(`Error configuring connection to agent server for non-interactive mode: ${authError}`);
+    console.error(`Please set AGENT_SERVER_URL and AGENT_SERVER_API_KEY environment variables or in your settings.`);
     process.exit(1);
   }
 
-  selectedAuthType = selectedAuthType || AuthType.USE_GEMINI;
-  const err = validateAuthMethod(selectedAuthType);
-  if (err != null) {
-    console.error(err);
-    process.exit(1);
-  }
-
-  await nonInteractiveConfig.refreshAuth(selectedAuthType);
+  // `nonInteractiveConfig.refreshAuth` call removed.
+  // The agent server handles authentication with the Gemini API.
   return nonInteractiveConfig;
 }

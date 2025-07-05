@@ -54,6 +54,13 @@ start:
 debug:
 	npm run debug
 
+# Agent Server specific commands
+start-agent-server:
+	npm start --workspace=@google/gemini-agent-server
+
+dev-agent-server:
+	npm run dev --workspace=@google/gemini-agent-server
+
 release:
 	npm run publish:release
 

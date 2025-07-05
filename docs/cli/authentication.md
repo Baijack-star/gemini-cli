@@ -1,110 +1,76 @@
-# Authentication Setup
+# Gemini CLI Authentication Setup
 
-The Gemini CLI requires you to authenticate with Google's AI services. On initial startup you'll need to configure **one** of the following authentication methods:
+The Gemini CLI now operates in a client-server model. The CLI (client) communicates with a separate Agent Server, which in turn interacts with Google's AI services. This section details how to configure authentication for both the Agent Server and the CLI client.
 
-1.  **Login with Google (Gemini Code Assist):**
-    - Use this option to log in with your google account.
-    - During initial startup, Gemini CLI will direct you to a webpage for authentication. Once authenticated, your credentials will be cached locally so the web login can be skipped on subsequent runs.
-    - Note that the web login must be done in a browser that can communicate with the machine Gemini CLI is being run from. (Specifically, the browser will be redirected to a localhost url that Gemini CLI will be listening on).
-    - <a id="workspace-gca">Users may have to specify a GOOGLE_CLOUD_PROJECT if:</a>
-      1. You have a Google Workspace account. Google Workspace is a paid service for businesses and organizations that provides a suite of productivity tools, including a custom email domain (e.g. your-name@your-company.com), enhanced security features, and administrative controls. These accounts are often managed by an employer or school.
-      1. You have received a free Code Assist license through the [Google Developer Program](https://developers.google.com/program/plans-and-pricing) (including qualified Google Developer Experts)
-      1. You have been assigned a license to a current Gemini Code Assist standard or enterprise subscription.
-      1. You are using the product outside the [supported regions](https://developers.google.com/gemini-code-assist/resources/available-locations) for free individual usage.>
-      1. You are a Google account holder under the age of 18
-      - If you fall into one of these categories, you must first configure a Google Cloud Project Id to use, [enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api) and [configure access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam).
+## Agent Server Configuration
 
-      You can temporarily set the environment variable in your current shell session using the following command:
+The Agent Server requires two primary pieces of authentication configuration, typically set as environment variables on the machine where the server is running:
 
-      ```bash
-      export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
-      ```
-      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
-
-      ```bash
-      echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
-      source ~/.bashrc
-      ```
-
-2.  **<a id="gemini-api-key"></a>Gemini API key:**
-    - Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
-    - Set the `GEMINI_API_KEY` environment variable. In the following methods, replace `YOUR_GEMINI_API_KEY` with the API key you obtained from Google AI Studio:
-      - You can temporarily set the environment variable in your current shell session using the following command:
+1.  **`GEMINI_API_KEY` (for Google AI Services)**:
+    *   This API key is used by the Agent Server to authenticate its requests to the Google Gemini API.
+    *   Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+    *   Set this environment variable on the server machine:
         ```bash
-        export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-        ```
-      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
-        ```bash
-        echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
-        source ~/.bashrc
+        export GEMINI_API_KEY="YOUR_GEMINI_API_KEY_FROM_AI_STUDIO"
         ```
 
-3.  **Vertex AI:**
-    - If not using express mode:
-      - Ensure you have a Google Cloud project and have enabled the Vertex AI API.
-      - Set up Application Default Credentials (ADC), using the following command:
+2.  **`AGENT_SERVER_API_KEY` (for Client to Server Authentication)**:
+    *   This is a secret key that you define. The Agent Server uses it to authenticate incoming requests from Gemini CLI clients (or any other programmatic clients).
+    *   Choose a strong, unique key.
+    *   Set this environment variable on the server machine:
         ```bash
-        gcloud auth application-default login
+        export AGENT_SERVER_API_KEY="YOUR_CHOSEN_SECRET_KEY_FOR_SERVER_ACCESS"
         ```
-        For more information, see [Set up Application Default Credentials for Google Cloud](https://cloud.google.com/docs/authentication/provide-credentials-adc).
-      - Set the `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, and `GOOGLE_GENAI_USE_VERTEXAI` environment variables. In the following methods, replace `YOUR_PROJECT_ID` and `YOUR_PROJECT_LOCATION` with the relevant values for your project:
-        - You can temporarily set these environment variables in your current shell session using the following commands:
-          ```bash
-          export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
-          export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION" # e.g., us-central1
-          export GOOGLE_GENAI_USE_VERTEXAI=true
-          ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
-          ```bash
-          echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
-          echo 'export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"' >> ~/.bashrc
-          echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
-          source ~/.bashrc
-          ```
-    - If using express mode:
-      - Set the `GOOGLE_API_KEY` environment variable. In the following methods, replace `YOUR_GOOGLE_API_KEY` with your Vertex AI API key provided by express mode:
-        - You can temporarily set these environment variables in your current shell session using the following commands:
-          ```bash
-          export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
-          export GOOGLE_GENAI_USE_VERTEXAI=true
-          ```
-        - For repeated use, you can add the environment variables to your [.env file](#persisting-environment-variables-with-env-files) or your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following commands add the environment variables to a `~/.bashrc` file:
-          ```bash
-          echo 'export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"' >> ~/.bashrc
-          echo 'export GOOGLE_GENAI_USE_VERTEXAI=true' >> ~/.bashrc
-          source ~/.bashrc
-          ```
+    *   **Important**: Any client wishing to connect to this Agent Server will need to use this key.
 
-### Persisting Environment Variables with `.env` Files
+## Gemini CLI (Client) Configuration
 
-You can create a **`.gemini/.env`** file in your project directory or in your home directory. Creating a plain **`.env`** file also works, but `.gemini/.env` is recommended to keep Gemini variables isolated from other tools.
+The Gemini CLI client needs to know how to connect and authenticate to your running Agent Server. This is configured by setting the following, typically as environment variables or in a `.gemini/.env` file (see below):
 
-Gemini CLI automatically loads environment variables from the **first** `.env` file it finds, using the following search order:
+1.  **`AGENT_SERVER_URL`**:
+    *   The full URL of your deployed Agent Server (e.g., `http://localhost:3000` if running locally, or `https://your-agent-server.example.com` if deployed).
+    *   Example:
+        ```bash
+        export AGENT_SERVER_URL="http://localhost:3000"
+        ```
 
-1. Starting in the **current directory** and moving upward toward `/`, for each directory it checks:
-   1. `.gemini/.env`
-   2. `.env`
-2. If no file is found, it falls back to your **home directory**:
-   - `~/.gemini/.env`
-   - `~/.env`
+2.  **`AGENT_SERVER_API_KEY`**:
+    *   The secret key that the Agent Server expects for client authentication. This **must match** the `AGENT_SERVER_API_KEY` configured on the Agent Server.
+    *   Example:
+        ```bash
+        export AGENT_SERVER_API_KEY="YOUR_CHOSEN_SECRET_KEY_FOR_SERVER_ACCESS"
+        ```
+
+### Persisting Client Configuration with `.env` Files
+
+For convenience, you can store the `AGENT_SERVER_URL` and `AGENT_SERVER_API_KEY` in a `.gemini/.env` file. This saves you from having to set environment variables in every new shell session.
+
+Gemini CLI automatically loads these variables from the **first** `.env` file it finds, using the following search order:
+
+1.  Starting in the **current directory** and moving upward toward `/`, for each directory it checks:
+    1.  `.gemini/.env`
+    2.  `.env` (a plain `.env` file also works, but `.gemini/.env` is recommended for Gemini-specific variables)
+2.  If no file is found in the current directory hierarchy, it falls back to your **home directory**:
+    *   `~/.gemini/.env`
+    *   `~/.env`
 
 > **Important:** The search stops at the **first** file encountered—variables are **not merged** across multiple files.
 
-#### Examples
+#### Example `.gemini/.env` file for the CLI:
 
-**Project-specific overrides** (take precedence when you are inside the project):
+Create or edit the file (e.g., `~/.gemini/.env` for user-wide settings, or `./.gemini/.env` for project-specific settings):
 
-```bash
-mkdir -p .gemini
-echo 'GOOGLE_CLOUD_PROJECT="your-project-id"' >> .gemini/.env
+```env
+AGENT_SERVER_URL="http://localhost:3000"
+AGENT_SERVER_API_KEY="YOUR_CHOSEN_SECRET_KEY_FOR_SERVER_ACCESS"
 ```
 
-**User-wide settings** (available in every directory):
+## Deprecated Authentication Methods
 
-```bash
-mkdir -p ~/.gemini
-cat >> ~/.gemini/.env <<'EOF'
-GOOGLE_CLOUD_PROJECT="your-project-id"
-GEMINI_API_KEY="your-gemini-api-key"
-EOF
-```
+Previous versions of the Gemini CLI supported direct authentication to Google's AI services using methods such as:
+
+*   Login with Google (OAuth-based flow)
+*   Direct `GEMINI_API_KEY` usage by the CLI
+*   Vertex AI authentication (ADC or Vertex-specific API keys)
+
+**These direct authentication methods within the CLI are now deprecated and no longer used.** The CLI exclusively connects to an Agent Server, and the Agent Server is responsible for authenticating with the Gemini API (using its own `GEMINI_API_KEY`). Ensure your Agent Server is configured as described above.

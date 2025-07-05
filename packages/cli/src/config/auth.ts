@@ -4,36 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment } from './config.js';
 
-export const validateAuthMethod = (authMethod: string): string | null => {
-  loadEnvironment();
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE) {
-    return null;
+/**
+ * Validates if the CLI is configured to connect to the Agent Server.
+ * It checks for AGENT_SERVER_URL and AGENT_SERVER_API_KEY.
+ * The `authMethod` parameter is kept for now for compatibility with existing call sites,
+ * but it's no longer used to select different auth strategies within the CLI itself.
+ */
+export const validateAuthMethod = (_authMethod?: string): string | null => {
+  loadEnvironment(); // Ensures .env files are loaded
+
+  const agentServerUrl = process.env.AGENT_SERVER_URL;
+  const agentServerApiKey = process.env.AGENT_SERVER_API_KEY;
+
+  if (!agentServerUrl) {
+    return 'AGENT_SERVER_URL environment variable not found. Please set it to the URL of your agent server (e.g., http://localhost:3000).';
   }
 
-  if (authMethod === AuthType.USE_GEMINI) {
-    if (!process.env.GEMINI_API_KEY) {
-      return 'GEMINI_API_KEY environment variable not found. Add that to your .env and try again, no reload needed!';
-    }
-    return null;
+  try {
+    // Basic URL validation
+    new URL(agentServerUrl);
+  } catch (e) {
+    return 'AGENT_SERVER_URL is not a valid URL.';
   }
 
-  if (authMethod === AuthType.USE_VERTEX_AI) {
-    const hasVertexProjectLocationConfig =
-      !!process.env.GOOGLE_CLOUD_PROJECT && !!process.env.GOOGLE_CLOUD_LOCATION;
-    const hasGoogleApiKey = !!process.env.GOOGLE_API_KEY;
-    if (!hasVertexProjectLocationConfig && !hasGoogleApiKey) {
-      return (
-        'Must specify GOOGLE_GENAI_USE_VERTEXAI=true and either:\n' +
-        '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
-        '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
-        'Update your .env and try again, no reload needed!'
-      );
-    }
-    return null;
+  if (!agentServerApiKey) {
+    return 'AGENT_SERVER_API_KEY environment variable not found. This key is required to authenticate with the agent server.';
   }
 
-  return 'Invalid auth method selected.';
+  // All checks passed, CLI is configured to connect to the agent server.
+  return null;
 };

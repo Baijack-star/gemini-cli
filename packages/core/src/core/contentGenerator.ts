@@ -35,73 +35,52 @@ export interface ContentGenerator {
 }
 
 export enum AuthType {
-  LOGIN_WITH_GOOGLE = 'oauth-personal',
+  // LOGIN_WITH_GOOGLE = 'oauth-personal', // Removed
   USE_GEMINI = 'gemini-api-key',
-  USE_VERTEX_AI = 'vertex-ai',
+  // USE_VERTEX_AI = 'vertex-ai', // Removed
 }
 
 export type ContentGeneratorConfig = {
   model: string;
   apiKey?: string;
-  vertexai?: boolean;
-  authType?: AuthType | undefined;
+  // vertexai?: boolean; // Removed
+  authType?: AuthType | undefined; // Will always be USE_GEMINI or undefined then defaulted
 };
 
 export async function createContentGeneratorConfig(
   model: string | undefined,
-  authType: AuthType | undefined,
+  authType: AuthType | undefined, // This will effectively always be USE_GEMINI
   config?: { getModel?: () => string },
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
-  const googleApiKey = process.env.GOOGLE_API_KEY;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
+
+  if (!geminiApiKey) {
+    throw new Error(
+      'GEMINI_API_KEY environment variable is required and not set.',
+    );
+  }
 
   // Use runtime model from config if available, otherwise fallback to parameter or default
   const effectiveModel = config?.getModel?.() || model || DEFAULT_GEMINI_MODEL;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     model: effectiveModel,
-    authType,
+    authType: AuthType.USE_GEMINI, // Force USE_GEMINI
+    apiKey: geminiApiKey,
   };
 
-  // if we are using google auth nothing else to validate for now
-  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-    return contentGeneratorConfig;
-  }
-
-  if (authType === AuthType.USE_GEMINI && geminiApiKey) {
-    contentGeneratorConfig.apiKey = geminiApiKey;
-    contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-    );
-
-    return contentGeneratorConfig;
-  }
-
-  if (
-    authType === AuthType.USE_VERTEX_AI &&
-    !!googleApiKey &&
-    googleCloudProject &&
-    googleCloudLocation
-  ) {
-    contentGeneratorConfig.apiKey = googleApiKey;
-    contentGeneratorConfig.vertexai = true;
-    contentGeneratorConfig.model = await getEffectiveModel(
-      contentGeneratorConfig.apiKey,
-      contentGeneratorConfig.model,
-    );
-
-    return contentGeneratorConfig;
-  }
+  contentGeneratorConfig.model = await getEffectiveModel(
+    contentGeneratorConfig.apiKey,
+    contentGeneratorConfig.model,
+  );
 
   return contentGeneratorConfig;
 }
 
 export async function createContentGenerator(
   config: ContentGeneratorConfig,
-  sessionId?: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  sessionId?: string, // sessionId might not be needed if CodeAssist path is removed
 ): Promise<ContentGenerator> {
   const version = process.env.CLI_VERSION || process.version;
   const httpOptions = {
@@ -109,28 +88,25 @@ export async function createContentGenerator(
       'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
     },
   };
-  if (config.authType === AuthType.LOGIN_WITH_GOOGLE) {
-    return createCodeAssistContentGenerator(
-      httpOptions,
-      config.authType,
-      sessionId,
-    );
-  }
 
-  if (
-    config.authType === AuthType.USE_GEMINI ||
-    config.authType === AuthType.USE_VERTEX_AI
-  ) {
+  if (config.authType === AuthType.USE_GEMINI) {
+    if (!config.apiKey) {
+      throw new Error(
+        'GEMINI_API_KEY is missing in contentGeneratorConfig for USE_GEMINI auth type.',
+      );
+    }
     const googleGenAI = new GoogleGenAI({
-      apiKey: config.apiKey === '' ? undefined : config.apiKey,
-      vertexai: config.vertexai,
+      apiKey: config.apiKey,
+      // vertexai: config.vertexai, // Removed
       httpOptions,
     });
 
     return googleGenAI.models;
   }
 
+  // Fallback or error if authType is somehow not USE_GEMINI
+  // Given createContentGeneratorConfig now forces USE_GEMINI, this path should ideally not be hit.
   throw new Error(
-    `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
+    `Error creating contentGenerator: Unsupported or misconfigured authType. Expected AuthType.USE_GEMINI. Received: ${config.authType}`,
   );
 }

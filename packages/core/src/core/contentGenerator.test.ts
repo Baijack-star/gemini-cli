@@ -9,24 +9,12 @@ import { createContentGenerator, AuthType } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
 
-vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
 
 describe('contentGenerator', () => {
-  it('should create a CodeAssistContentGenerator', async () => {
-    const mockGenerator = {} as unknown;
-    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
-      mockGenerator as never,
-    );
-    const generator = await createContentGenerator({
-      model: 'test-model',
-      authType: AuthType.LOGIN_WITH_GOOGLE,
-    });
-    expect(createCodeAssistContentGenerator).toHaveBeenCalled();
-    expect(generator).toBe(mockGenerator);
-  });
+  // Test for CodeAssistContentGenerator removed as LOGIN_WITH_GOOGLE auth type is removed.
 
-  it('should create a GoogleGenAI content generator', async () => {
+  it('should create a GoogleGenAI content generator for USE_GEMINI', async () => {
     const mockGenerator = {
       models: {},
     } as unknown;
