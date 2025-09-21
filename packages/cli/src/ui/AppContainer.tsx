@@ -81,6 +81,7 @@ import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { useHeartbeatReminder } from './hooks/useHeartbeatReminder.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -576,6 +577,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
       streamingState,
       submitQuery,
     });
+
+  const isHeartbeatActive =
+    isConfigInitialized && !initError && !!geminiClient?.isInitialized?.();
+  useHeartbeatReminder({
+    isActive: isHeartbeatActive,
+    addMessage,
+  });
 
   cancelHandlerRef.current = useCallback(() => {
     const pendingHistoryItems = [
